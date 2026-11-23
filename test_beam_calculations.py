@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 import numpy as np
 
@@ -11,6 +13,7 @@ from beam_calculations import (
     analyze_beam,
     validate_beam_input,
 )
+from beam_storage import load_design_file, save_design_file
 
 
 class BeamCalculationTests(unittest.TestCase):
@@ -58,6 +61,66 @@ class BeamCalculationTests(unittest.TestCase):
         member = LUMBER_SIZES["Douglas Fir 2x8"]
         self.assertGreater(member.sx_in3, 0)
         self.assertGreater(member.ix_in4, 0)
+
+    def test_custom_deflection_limit_is_used(self):
+        beam = BeamInput(
+            beam_type="simply_supported",
+            span_ft=30.0,
+            point_loads=(),
+            uniform_loads=(UniformLoad(2.0, 0.0, 15.0),),
+            member=STEEL_SHAPES["W18x35"],
+            deflection_limit_in=0.5,
+        )
+        result = analyze_beam(beam)
+        self.assertEqual(result.deflection_limit_in, 0.5)
+        self.assertIs(result.deflection_pass, False)
+
+
+class BeamStorageTests(unittest.TestCase):
+    def test_save_and_open_preserves_all_design_inputs(self):
+        design = {
+            "version": 1,
+            "support_type": "cantilever",
+            "span_ft": 24.0,
+            "deflection_limit_in": 0.8,
+            "material": "lumber",
+            "section": "Douglas Fir 2x10",
+            "point_loads": [
+                {"magnitude_kip": 1.25, "position_ft": 18.0},
+            ],
+            "uniform_loads": [
+                {
+                    "magnitude_kip_ft": 0.3,
+                    "start_ft": 2.0,
+                    "end_ft": 20.0,
+                },
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "beam.beam.json"
+            save_design_file(path, design)
+            restored = load_design_file(path)
+
+        self.assertEqual(restored, design)
+
+    def test_save_rejects_load_positions_outside_span(self):
+        design = {
+            "version": 1,
+            "support_type": "simply_supported",
+            "span_ft": 10.0,
+            "deflection_limit_in": 0.5,
+            "material": "steel",
+            "section": "W18x35",
+            "point_loads": [
+                {"magnitude_kip": 1.0, "position_ft": 12.0},
+            ],
+            "uniform_loads": [],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invalid.beam.json"
+            with self.assertRaisesRegex(ValueError, "position"):
+                save_design_file(path, design)
+            self.assertFalse(path.exists())
 
 
 if __name__ == "__main__":

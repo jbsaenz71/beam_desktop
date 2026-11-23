@@ -1,7 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+from tkinter import filedialog
 
-import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
@@ -13,6 +14,7 @@ from beam_calculations import (
     UniformLoad,
     analyze_beam,
 )
+from beam_storage import load_design_file, save_design_file
 
 
 class BeamDesignerApp:
@@ -28,8 +30,17 @@ class BeamDesignerApp:
 
         self._configure_styles()
         self._build_layout()
+        self._build_menu()
         self._build_example()
         self.calculate()
+
+    def _build_menu(self) -> None:
+        menu_bar = tk.Menu(self.root)
+        file_menu = tk.Menu(menu_bar, tearoff=False)
+        file_menu.add_command(label="Save", command=self.save_design)
+        file_menu.add_command(label="Open", command=self.open_design)
+        menu_bar.add_cascade(label="File", menu=file_menu)
+        self.root.config(menu=menu_bar)
 
     def _configure_styles(self) -> None:
         style = ttk.Style(self.root)
@@ -100,9 +111,14 @@ class BeamDesignerApp:
         self.span_entry.grid(row=3, column=1, sticky="ew")
         ttk.Label(panel, text="ft").grid(row=3, column=2, sticky="w", padx=(6, 0))
 
+        ttk.Label(panel, text="Deflection limit").grid(row=4, column=0, sticky="w")
+        self.deflection_limit_entry = ttk.Entry(panel)
+        self.deflection_limit_entry.grid(row=4, column=1, sticky="ew")
+        ttk.Label(panel, text="in").grid(row=4, column=2, sticky="w", padx=(6, 0))
+
         point_section = ttk.LabelFrame(panel, text="Point Loads", style="Card.TLabelframe",
                                        padding=8)
-        point_section.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(14, 8))
+        point_section.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(14, 8))
         self.point_container = ttk.Frame(point_section)
         self.point_container.pack(fill="x")
         ttk.Button(point_section, text="+ Add point load",
@@ -110,7 +126,7 @@ class BeamDesignerApp:
 
         uniform_section = ttk.LabelFrame(panel, text="Uniform Loads", style="Card.TLabelframe",
                                          padding=8)
-        uniform_section.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(8, 8))
+        uniform_section.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(8, 8))
         self.uniform_container = ttk.Frame(uniform_section)
         self.uniform_container.pack(fill="x")
         ttk.Button(uniform_section, text="+ Add uniform load",
@@ -118,7 +134,7 @@ class BeamDesignerApp:
 
         member_section = ttk.LabelFrame(panel, text="Member", style="Card.TLabelframe",
                                         padding=8)
-        member_section.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(8, 8))
+        member_section.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(8, 8))
         ttk.Label(member_section, text="Material").grid(row=0, column=0, sticky="w")
         material_buttons = ttk.Frame(member_section)
         material_buttons.grid(row=0, column=1, sticky="ew")
@@ -144,10 +160,10 @@ class BeamDesignerApp:
 
         ttk.Button(panel, text="Calculate Beam", style="Primary.TButton",
                    command=self.calculate).grid(
-            row=7, column=0, columnspan=3, sticky="ew", pady=(12, 8)
+            row=8, column=0, columnspan=3, sticky="ew", pady=(12, 8)
         )
         ttk.Button(panel, text="Reset Example", command=self._build_example).grid(
-            row=8, column=0, columnspan=3, sticky="ew"
+            row=9, column=0, columnspan=3, sticky="ew"
         )
 
         right.columnconfigure(0, weight=1)
@@ -176,6 +192,8 @@ class BeamDesignerApp:
         self.beam_type.set("simply_supported")
         self.span_entry.delete(0, "end")
         self.span_entry.insert(0, "30")
+        self.deflection_limit_entry.delete(0, "end")
+        self.deflection_limit_entry.insert(0, "1.0")
         self.member_type.set("steel")
         self.member_name.set("W18x35")
         self._refresh_member_choices()
@@ -268,9 +286,106 @@ class BeamDesignerApp:
         except ValueError:
             raise ValueError(f"{label} must be a number.")
 
+    def _collect_design(self) -> dict:
+        span = self._parse_float(self.span_entry, "Span")
+        deflection_limit = self._parse_float(
+            self.deflection_limit_entry, "Deflection limit"
+        )
+        point_loads = []
+        for row in self.point_container.winfo_children():
+            point_loads.append({
+                "magnitude_kip": self._parse_float(
+                    row.magnitude_entry, "Point load magnitude"
+                ),
+                "position_ft": self._parse_float(
+                    row.position_entry, "Point load position"
+                ),
+            })
+        uniform_loads = []
+        for row in self.uniform_container.winfo_children():
+            uniform_loads.append({
+                "magnitude_kip_ft": self._parse_float(
+                    row.magnitude_entry, "Uniform load magnitude"
+                ),
+                "start_ft": self._parse_float(
+                    row.start_entry, "Uniform load start"
+                ),
+                "end_ft": self._parse_float(
+                    row.end_entry, "Uniform load end"
+                ),
+            })
+        return {
+            "version": 1,
+            "support_type": self.beam_type.get(),
+            "span_ft": span,
+            "deflection_limit_in": deflection_limit,
+            "material": self.member_type.get(),
+            "section": self.member_name.get(),
+            "point_loads": point_loads,
+            "uniform_loads": uniform_loads,
+        }
+
+    def save_design(self) -> None:
+        try:
+            design = self._collect_design()
+        except ValueError as exc:
+            messagebox.showerror("Unable to save beam", str(exc))
+            return
+
+        path = filedialog.asksaveasfilename(
+            title="Save Beam Design",
+            defaultextension=".beam.json",
+            filetypes=[("Beam design", "*.beam.json"), ("JSON", "*.json")],
+        )
+        if not path:
+            return
+        try:
+            save_design_file(path, design)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("Unable to save beam", str(exc))
+
+    def open_design(self) -> None:
+        path = filedialog.askopenfilename(
+            title="Open Beam Design",
+            filetypes=[("Beam design", "*.beam.json"), ("JSON", "*.json")],
+        )
+        if not path:
+            return
+        try:
+            design = load_design_file(path)
+            self._clear_load_rows()
+            self.beam_type.set(design["support_type"])
+            self.span_entry.delete(0, "end")
+            self.span_entry.insert(0, str(design["span_ft"]))
+            self.deflection_limit_entry.delete(0, "end")
+            self.deflection_limit_entry.insert(
+                0, str(design["deflection_limit_in"])
+            )
+            self.member_type.set(design["material"])
+            self._refresh_member_choices()
+            self.member_name.set(design["section"])
+            self._update_member_properties()
+
+            for load in design.get("point_loads", []):
+                self.add_point_load(
+                    load["magnitude_kip"], load["position_ft"]
+                )
+            for load in design.get("uniform_loads", []):
+                self.add_uniform_load(
+                    load["magnitude_kip_ft"],
+                    load["start_ft"],
+                    load["end_ft"],
+                )
+            self.calculate()
+        except (OSError, TypeError, ValueError) as exc:
+            messagebox.showerror("Unable to open beam", str(exc))
+
     def calculate(self) -> None:
         try:
             span = self._parse_float(self.span_entry, "Span")
+            deflection_limit = self._parse_float(
+                self.deflection_limit_entry, "Deflection limit"
+            )
             point_loads = []
             for row in self.point_container.winfo_children():
                 magnitude = self._parse_float(row.magnitude_entry, "Point load magnitude")
@@ -290,6 +405,7 @@ class BeamDesignerApp:
                 point_loads=tuple(point_loads),
                 uniform_loads=tuple(uniform_loads),
                 member=self._selected_member(),
+                deflection_limit_in=deflection_limit,
             )
             result = analyze_beam(beam)
         except (ValueError, KeyError) as exc:
@@ -349,7 +465,7 @@ class BeamDesignerApp:
                          fontsize=8)
         for load in beam.uniform_loads:
             count = max(3, int((load.end_ft - load.start_ft) / 2))
-            positions = __import__("numpy").linspace(load.start_ft, load.end_ft, count)
+            positions = np.linspace(load.start_ft, load.end_ft, count)
             for position in positions:
                 beam_ax.annotate(
                     "", xy=(position, 0.05), xytext=(position, 0.55),

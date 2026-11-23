@@ -35,6 +35,7 @@ class BeamInput:
     point_loads: tuple[PointLoad, ...] = field(default_factory=tuple)
     uniform_loads: tuple[UniformLoad, ...] = field(default_factory=tuple)
     member: MemberProperties | None = None
+    deflection_limit_in: float | None = None
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,9 @@ def validate_beam_input(beam: BeamInput) -> list[str]:
         errors.append("Span must be greater than zero.")
     if beam.span_ft > 100:
         errors.append("Span must be 100 ft or less.")
+    if beam.deflection_limit_in is not None:
+        if not np.isfinite(beam.deflection_limit_in) or beam.deflection_limit_in <= 0:
+            errors.append("Deflection limit must be greater than zero.")
 
     for index, load in enumerate(beam.point_loads, start=1):
         if not np.isfinite(load.magnitude_kip) or not np.isfinite(load.position_ft):
@@ -112,6 +116,7 @@ def default_beam() -> BeamInput:
         point_loads=(),
         uniform_loads=(UniformLoad(2.0, 0.0, 15.0),),
         member=STEEL_SHAPES["W18x35"],
+        deflection_limit_in=30.0 * 12.0 / 360.0,
     )
 
 
@@ -282,7 +287,11 @@ def analyze_beam(beam: BeamInput, samples: int = 3001) -> AnalysisResult:
     moment_location = float(x[int(np.argmax(np.abs(moment)))])
     max_deflection = float(np.max(np.abs(deflection)))
     deflection_location = float(x[int(np.argmax(np.abs(deflection)))])
-    deflection_limit = beam.span_ft * 12.0 / 360.0
+    deflection_limit = (
+        beam.deflection_limit_in
+        if beam.deflection_limit_in is not None
+        else beam.span_ft * 12.0 / 360.0
+    )
 
     bending_stress = max_moment * 12.0 / member.sx_in3
     bending_pass = bending_stress <= member.fb_ksi

@@ -5,3 +5,4 @@
 - Asked: Run all validation cases in spec.md against the beam calculations and report expected versus actual values. Changed: Ran the specification's 30 ft simply supported W18x35 partial-uniform-load case through beam_calculations.analyze_beam and compared all stated outputs. Worked: Yes.
 - Asked: Did any validation cases fail? Changed: Confirmed that no previous validation case failed; no project files or calculations changed. Worked: Yes.
 - Asked: Add Save and Open requirements to spec.md, with support for saving support type, span, section, deflection limit, and loads. Changed: Updated spec.md with the File menu and file storage requirements; no app code was changed. Worked: Yes.
+- Asked: Build the Save/Open feature described in spec.md. Changed: Added a File menu, editable deflection limit, validated JSON beam-design storage, load restoration, and round-trip/invalid-input tests. Worked: Yes; all 7 tests pass, Python files compile, and the Tkinter app starts.
