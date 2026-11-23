@@ -1,0 +1,1 @@
+- Asked: Read AGENTS.md and list the rules it contains, and classify each rule as applying to a Python desktop app or a web app. Changed: Read the file and classified its only rule; no project code or configuration was changed. Worked: Yes.
