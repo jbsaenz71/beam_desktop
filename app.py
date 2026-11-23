@@ -17,6 +17,7 @@ from beam_calculations import (
 )
 from beam_storage import load_design_file, save_design_file
 from beam_export import export_results_csv
+from beam_report import export_calculation_sheet_pdf
 
 
 class BeamDesignerApp:
@@ -30,6 +31,7 @@ class BeamDesignerApp:
         self.member_type = tk.StringVar(value="steel")
         self.member_name = tk.StringVar(value="W18x35")
         self._latest_result: AnalysisResult | None = None
+        self._latest_beam: BeamInput | None = None
 
         self._configure_styles()
         self._build_layout()
@@ -184,6 +186,13 @@ class BeamDesignerApp:
             state="disabled",
         )
         self.export_button.pack(side="right", padx=(8, 0))
+        self.pdf_button = ttk.Button(
+            self.status_frame,
+            text="Calculation PDF",
+            command=self.export_calculation_sheet,
+            state="disabled",
+        )
+        self.pdf_button.pack(side="right", padx=(8, 0))
 
         self.figure = Figure(figsize=(11, 7), dpi=100, facecolor="#f4f7f9")
         self.canvas = FigureCanvasTkAgg(self.figure, master=right)
@@ -407,6 +416,26 @@ class BeamDesignerApp:
         except (OSError, ValueError) as exc:
             messagebox.showerror("Unable to export results", str(exc))
 
+    def export_calculation_sheet(self) -> None:
+        if self._latest_beam is None or self._latest_result is None:
+            messagebox.showerror(
+                "Unable to export calculation sheet",
+                "Calculate a valid beam first.",
+            )
+            return
+
+        path = filedialog.asksaveasfilename(
+            title="Export Calculation Sheet",
+            defaultextension=".pdf",
+            filetypes=[("PDF file", "*.pdf")],
+        )
+        if not path:
+            return
+        try:
+            export_calculation_sheet_pdf(path, self._latest_beam, self._latest_result)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("Unable to export calculation sheet", str(exc))
+
     def calculate(self) -> None:
         try:
             span = self._parse_float(self.span_entry, "Span")
@@ -436,13 +465,17 @@ class BeamDesignerApp:
             )
             result = analyze_beam(beam)
         except (ValueError, KeyError) as exc:
+            self._latest_beam = None
             self._latest_result = None
             self.export_button.configure(state="disabled")
+            self.pdf_button.configure(state="disabled")
             messagebox.showerror("Unable to calculate beam", str(exc))
             return
 
+        self._latest_beam = beam
         self._latest_result = result
         self.export_button.configure(state="normal")
+        self.pdf_button.configure(state="normal")
         bending_ok = result.bending_pass is True
         deflection_ok = result.deflection_pass is True
         overall_ok = bending_ok and deflection_ok

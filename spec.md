@@ -27,6 +27,11 @@ whether the beam is strong and stiff enough.
 - An Export Results button that saves a CSV file compatible with Excel,
   with one row per analysis sample point and columns `x_ft`, `V_kip`,
   `M_kip_ft`, and `deflection_in`.
+- An Export Calculation Sheet button that saves a PDF with the beam inputs
+  (support type, span, section, deflection limit, and all loads) at the top,
+  followed by the beam/load diagram, shear, moment, and deflection diagrams,
+  and bending and deflection check results. The sheet should be suitable to
+  hand in with a design.
 
 ## Look and feel
 Clean and professional, with an example beam loaded when it opens.

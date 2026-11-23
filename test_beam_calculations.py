@@ -16,6 +16,7 @@ from beam_calculations import (
 )
 from beam_storage import load_design_file, save_design_file
 from beam_export import CSV_COLUMNS, export_results_csv
+from beam_report import export_calculation_sheet_pdf
 
 
 class BeamCalculationTests(unittest.TestCase):
@@ -155,6 +156,25 @@ class BeamExportTests(unittest.TestCase):
                 float(result.deflection_in[0]),
             ),
         )
+
+    def test_calculation_sheet_exports_a_pdf(self):
+        beam = BeamInput(
+            beam_type="simply_supported",
+            span_ft=30.0,
+            point_loads=(),
+            uniform_loads=(UniformLoad(2.0, 0.0, 15.0),),
+            member=STEEL_SHAPES["W18x35"],
+            deflection_limit_in=1.0,
+        )
+        result = analyze_beam(beam, samples=301)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "calculation-sheet.pdf"
+            export_calculation_sheet_pdf(path, beam, result)
+            pdf_data = path.read_bytes()
+
+        self.assertTrue(pdf_data.startswith(b"%PDF-"))
+        self.assertTrue(pdf_data.rstrip().endswith(b"%%EOF"))
 
 
 if __name__ == "__main__":
