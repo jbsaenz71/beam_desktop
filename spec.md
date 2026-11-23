@@ -24,6 +24,9 @@ whether the beam is strong and stiff enough.
 ## Outputs
 - The beam with its loads, and the three diagrams
 - Pass or fail for bending and deflection
+- An Export Results button that saves a CSV file compatible with Excel,
+  with one row per analysis sample point and columns `x_ft`, `V_kip`,
+  `M_kip_ft`, and `deflection_in`.
 
 ## Look and feel
 Clean and professional, with an example beam loaded when it opens.
