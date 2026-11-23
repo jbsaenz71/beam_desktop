@@ -28,6 +28,13 @@ whether the beam is strong and stiff enough.
 ## Look and feel
 Clean and professional, with an example beam loaded when it opens.
 Inputs in a panel on the left, the beam and diagrams on the right, and a window that can be resized. Remove the lines about phones.
+- Include a File menu with Save and Open commands.
+
+## File storage
+- Save beam designs to a file.
+- Saved data includes support type, span, section, deflection limit,
+  point loads, and uniform loads.
+- Open a saved file and restore all of those beam inputs.
 
 ## Validation
 Simply supported, 30 ft, W18x35, uniform 2 kips/ft from 0 to 15 ft
