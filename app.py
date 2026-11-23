@@ -9,12 +9,14 @@ from matplotlib.figure import Figure
 from beam_calculations import (
     LUMBER_SIZES,
     STEEL_SHAPES,
+    AnalysisResult,
     BeamInput,
     PointLoad,
     UniformLoad,
     analyze_beam,
 )
 from beam_storage import load_design_file, save_design_file
+from beam_export import export_results_csv
 
 
 class BeamDesignerApp:
@@ -27,6 +29,7 @@ class BeamDesignerApp:
         self.beam_type = tk.StringVar(value="simply_supported")
         self.member_type = tk.StringVar(value="steel")
         self.member_name = tk.StringVar(value="W18x35")
+        self._latest_result: AnalysisResult | None = None
 
         self._configure_styles()
         self._build_layout()
@@ -174,6 +177,13 @@ class BeamDesignerApp:
         self.status_label = ttk.Label(self.status_frame, text="", style="Status.TLabel",
                                       padding=(10, 8))
         self.status_label.pack(side="left", fill="x", expand=True)
+        self.export_button = ttk.Button(
+            self.status_frame,
+            text="Export Results",
+            command=self.export_results,
+            state="disabled",
+        )
+        self.export_button.pack(side="right", padx=(8, 0))
 
         self.figure = Figure(figsize=(11, 7), dpi=100, facecolor="#f4f7f9")
         self.canvas = FigureCanvasTkAgg(self.figure, master=right)
@@ -380,6 +390,23 @@ class BeamDesignerApp:
         except (OSError, TypeError, ValueError) as exc:
             messagebox.showerror("Unable to open beam", str(exc))
 
+    def export_results(self) -> None:
+        if self._latest_result is None:
+            messagebox.showerror("Unable to export results", "Calculate a valid beam first.")
+            return
+
+        path = filedialog.asksaveasfilename(
+            title="Export Beam Results",
+            defaultextension=".csv",
+            filetypes=[("CSV file", "*.csv")],
+        )
+        if not path:
+            return
+        try:
+            export_results_csv(path, self._latest_result)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("Unable to export results", str(exc))
+
     def calculate(self) -> None:
         try:
             span = self._parse_float(self.span_entry, "Span")
@@ -409,9 +436,13 @@ class BeamDesignerApp:
             )
             result = analyze_beam(beam)
         except (ValueError, KeyError) as exc:
+            self._latest_result = None
+            self.export_button.configure(state="disabled")
             messagebox.showerror("Unable to calculate beam", str(exc))
             return
 
+        self._latest_result = result
+        self.export_button.configure(state="normal")
         bending_ok = result.bending_pass is True
         deflection_ok = result.deflection_pass is True
         overall_ok = bending_ok and deflection_ok

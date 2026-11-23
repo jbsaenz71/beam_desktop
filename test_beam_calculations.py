@@ -1,3 +1,4 @@
+import csv
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,6 +15,7 @@ from beam_calculations import (
     validate_beam_input,
 )
 from beam_storage import load_design_file, save_design_file
+from beam_export import CSV_COLUMNS, export_results_csv
 
 
 class BeamCalculationTests(unittest.TestCase):
@@ -121,6 +123,38 @@ class BeamStorageTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "position"):
                 save_design_file(path, design)
             self.assertFalse(path.exists())
+
+
+class BeamExportTests(unittest.TestCase):
+    def test_csv_has_unit_columns_and_one_row_per_analysis_sample(self):
+        beam = BeamInput(
+            beam_type="simply_supported",
+            span_ft=12.0,
+            point_loads=(PointLoad(4.0, 6.0),),
+            uniform_loads=(),
+            member=STEEL_SHAPES["W18x35"],
+        )
+        result = analyze_beam(beam, samples=101)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "results.csv"
+            export_results_csv(path, result)
+            with path.open(newline="", encoding="utf-8-sig") as file:
+                rows = list(csv.reader(file))
+
+        self.assertEqual(tuple(rows[0]), CSV_COLUMNS)
+        self.assertEqual(len(rows) - 1, len(result.x_ft))
+        self.assertEqual(len(rows[1]), 4)
+        first_row = tuple(float(value) for value in rows[1])
+        self.assertEqual(
+            first_row,
+            (
+                float(result.x_ft[0]),
+                float(result.shear_kip[0]),
+                float(result.moment_kip_ft[0]),
+                float(result.deflection_in[0]),
+            ),
+        )
 
 
 if __name__ == "__main__":
