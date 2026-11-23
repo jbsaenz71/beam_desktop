@@ -1,1 +1,2 @@
 - Asked: Read AGENTS.md and list the rules it contains, and classify each rule as applying to a Python desktop app or a web app. Changed: Read the file and classified its only rule; no project code or configuration was changed. Worked: Yes.
+- Asked: Update AGENTS.md for this Python desktop app built with Tkinter, NumPy, and Matplotlib, started with `python app.py`; remove web-only rules and keep the prompt log rule. Changed: Updated AGENTS.md with the project stack/start command and retained the prompt-log rule. Worked: Yes.
