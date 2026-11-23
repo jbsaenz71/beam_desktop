@@ -1,5 +1,11 @@
 # Beam Designer
 
+## Platform
+- Python desktop app using Tkinter, started with `python app.py`
+- Calculations with numpy, kept in their own module, separate from
+  the window code
+- Diagrams drawn with matplotlib, embedded in the window
+
 ## Purpose
 Shear, moment, and deflection diagrams for a beam, with a check of
 whether the beam is strong and stiff enough.
